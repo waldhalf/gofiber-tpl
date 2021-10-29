@@ -15,6 +15,7 @@ func main(){
 			LastName: faker.LastName(),
 			Email: faker.Email(),
 			IsAdmin: false,
+			IsAmbassador: true,
 		}
 		user.SetPassword("1234")
 		database.DB.Create(&user)

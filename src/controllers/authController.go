@@ -1,15 +1,13 @@
 package controllers
 
 import (
-	"fmt"
-	"strconv"
+	"strings"
 	"test/waldhalf/gofiber-tpl/src/database"
 	"test/waldhalf/gofiber-tpl/src/middlewares"
 	"test/waldhalf/gofiber-tpl/src/models"
 
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -48,6 +46,7 @@ func Register(c *fiber.Ctx) error {
 		LastName: data["last_name"],
 		Email: data["email"],
 		IsAdmin: false,
+		IsAmbassador: strings.Contains(c.Path(), "/api/ambassador"),
 	}
 	// On a attaché au user la méthode de "fabrication" du password
 	user.SetPassword(data["password"])
@@ -84,13 +83,22 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generation du JWT
-	payload := jwt.StandardClaims{
-		Subject: strconv.Itoa(int(user.Id)),
-		ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+	isAmbassador := strings.Contains(c.Path(), "/api/ambassador")
+	var scope string
+	if isAmbassador {
+		scope = "ambassador"
+	} else {
+		scope = "admin"
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, payload).SignedString([]byte("secret"))
+	if !isAmbassador && user.IsAmbassador {
+		c.Status(fiber.StatusUnauthorized)
+		return c.JSON(fiber.Map{
+			"message":  "unauthorized controller",
+		})
+	}
+
+	token, err := middlewares.GenerateJWT(user.Id, scope)
 
 	if err != nil {
 		c.Status(fiber.StatusBadRequest)
@@ -120,6 +128,12 @@ func User(c *fiber.Ctx) error{
 	var user models.User
 
 	database.DB.Where("id = ?", id).First(&user)
+	if strings.Contains(c.Path(), "/api/ambassador"){
+		ambassador := models.Ambassador(user)
+		ambassador.CalculateRenevue(database.DB)
+		
+		return c.JSON(ambassador)
+	}
 	return c.JSON(user)
 }
 
@@ -144,12 +158,12 @@ func UpdateProfile(c *fiber.Ctx) error{
 	id, _ := middlewares.GetUserId(c)
 
 	user := models.User{
-		Id:			id,
 		FirstName: 	data["first_name"],
 		LastName: 	data["last_name"],
 		Email: 		data["email"],
 	}
-	fmt.Println(user)
+
+	user.Id = id
 
 	database.DB.Model(&user).Updates(&user)
 
@@ -172,9 +186,8 @@ func UpdatePassword(c *fiber.Ctx) error{
 
 	id, _ := middlewares.GetUserId(c)
 
-	user := models.User{
-		Id:			id,
-	}
+	user := models.User{}
+	user.Id = id
 	
 	user.SetPassword(data["password"])
 

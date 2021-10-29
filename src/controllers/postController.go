@@ -41,9 +41,8 @@ func GetPost(c *fiber.Ctx) error {
 
 func UpdatePost(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
-	post := models.Post{
-		Id: uint(id),
-	}
+	post := models.Post{}
+	post.Id = uint(id)
 	if err := c.BodyParser(&post); err != nil {
 		return err
 	}
@@ -61,9 +60,8 @@ func UpdatePost(c *fiber.Ctx) error {
 
 func DeletePost(c *fiber.Ctx) error {
 	id, _ := strconv.Atoi(c.Params("id"))
-	post := models.Post{
-		Id: uint(id),
-	}
+	post := models.Post{}
+	post.Id = uint(id)
 	oldPost := database.DB.Find(&post)
 
 	if oldPost.RowsAffected <= 0 {
